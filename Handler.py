@@ -10,9 +10,11 @@ import os
 from Model import *
 
 
-import config_models as mcfg
-import config_cron   as ccfg
+import config_models  as mcfg
+import config_handler as hcfg
 
+# setting time zone
+os.environ['TZ'] = 'UTC'
 
 # ––– CLASS DEFINITION –––
 
@@ -21,7 +23,7 @@ class Handler():
 		self.models = []
 
 		for model in mcfg.models:
-			self.models.append(mcfg.model_classes[model](name = model, init_time = mcfg.init_time[model]))
+			self.models.append(mcfg.model_classes[model](name = model, **mcfg.props[model]))
 
 		os.chdir(hcfg.main_dir)
 		os.environ['PWD'] = os.getcwd()
