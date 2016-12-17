@@ -7,19 +7,19 @@
 
 import os
 import numpy as np
+import pickle
+import subprocess as sp
+from abc import ABCMeta, abstractmethod
+from netCDF4 import Dataset
+
+# plot-related imports
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap, addcyclic, shiftgrid
 
-import pickle
-import subprocess as sp
-from abc import ABCMeta, abstractmethod
-
-from netCDF4 import Dataset
-
+# local file imports
 import mpl_util
-
 import config_plot as pcfg
 
 # setting time zone
@@ -37,7 +37,7 @@ class Plot(Basemap):
 
 	def addLayer(self, layer):
 		"""
-		Adds given layer
+		Adds given layer to list, of which each element will be plotted eventually
 		"""
 		self.layers.append(layer)
 
@@ -77,69 +77,70 @@ class BackgroundLayer(Layer):
 		self.latEnd   = coords[3]
 	
 	def plot(self, plot, data):
+		"""
+		Plot borders and/or the topography
+		"""
+		
 		if self.bgtype == "borders" or self.bgtype == "both":
 			# draw coastlines, country boundaries, fill continents.
 			plot.drawcoastlines(linewidth=0.25)
 			plot.drawcountries(linewidth=0.25)
-			#plot.fillcontinents(color='white',lake_color='white')
+			
 			# draw the edge of the map projection region (the projection limb)
 			plot.drawmapboundary(fill_color='white')
+			
 			# draw lat/lon grid lines every 30 degrees.
 			plot.drawmeridians(np.arange(0,360,30))
 			plot.drawparallels(np.arange(-90,90,30))
+
 		if self.bgtype == "topo" or self.bgtype == "both":
+			# Detailed Topography File (has to be downloaded manually)
+			# Pray that you can still find it here: http://bit.ly/2i0350v
+			etopo1name = 'ETOPO1_Ice_g_gmt4.grd'
 			
-			# https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO1/data/ice_surface/grid_registered/netcdf/
-			etopo1name='ETOPO1_Ice_g_gmt4.grd'
-			#levels=[0,0.0001,0.0002,.0003,.0004,.0005,.0006,.0007,.0008,.0009,.0010,.0011,.0012,.0013,.0014,.0015,.0016,
-			#		50,75,100,150,200,250,300,400,500,625,750,1000,1250,1500,1750,2000,2250,2500,4000]
-			levels=[0,50,200,400,600,800,1000,1250,1500,1750,2000,2250,2500,3000]
-			etopo1 = Dataset(etopo1name,'r')
+			# Read file if present
+			try:
+				etopo1 = Dataset(etopo1name,'r')
+			except OSError:
+				print("You need the file 'ETOPO1_Ice_g_gmt4.grd' in this directory. Try to find it here: http://bit.ly/2i0350v")
+				exit()
 			
+			# Get lons/lats from file
 			lons = etopo1.variables["x"][:]
 			lats = etopo1.variables["y"][:]
-			
+			# get indices representing the area which will be plotted
 			res = self.findSubsetIndices(self.latStart-5,self.latEnd+5+30,self.lonStart-70,self.lonEnd+10,lats,lons)
+			# get correct 2d-Format for plotting
+			lon,lat=np.meshgrid(lons[res[0]:res[1]],lats[res[2]:res[3]])
+
+			# extract the topography from the file
+			height = etopo1.variables["z"][int(res[2]):int(res[3]),int(res[0]):int(res[1])]		
 			
-			lon,lat=np.meshgrid(lons[res[0]:res[1]],lats[res[2]:res[3]])    
-			#print ("Extracted data for area %s : (%s,%s) to (%s,%s)"%(name,lon.min(),lat.min(),lon.max(),lat.max()))
-			bathy = etopo1.variables["z"][int(res[2]):int(res[3]),int(res[0]):int(res[1])]
-			bathySmoothed = bathy #laplaceFilter.laplace_filter(bathy,M=None)
 			
-			if self.lonStart < 0 and self.lonEnd < 0:
-				lon_0= - (abs(self.lonEnd)+abs(self.lonStart))/2.0
-			else:
-				lon_0=(abs(self.lonEnd)+abs(self.lonStart))/2.0
-			
-			x, y = plot(lon,lat)
-			
+			# Draw land/sea mask, longitudes and latitudes
 			plot.drawlsmask(land_color='#0fc64f', ocean_color='#2BBBFF',resolution='h',lakes=True,grid=1.25)
 			plot.drawmeridians(np.arange(lons.min(),lons.max(),5),labels=[0,0,0,1])
 			plot.drawparallels(np.arange(lats.min(),lats.max(),2),labels=[1,0,0,0])	
 
 			
-			import matplotlib.colors as colors
-
-			def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
-				new_cmap = colors.LinearSegmentedColormap.from_list(
-					'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
-					cmap(np.linspace(minval, maxval, n)))
-				return new_cmap
-
-			
-			#plt.cm.gist_earth
+			# Take standard cmap "terrain" as a starting point
 			cmap = plt.get_cmap('terrain')
-			new_cmap = truncate_colormap(cmap, 0.25, 1.0)
 
-			CS1 = plot.contourf(x,y,bathySmoothed,levels,
-					cmap=new_cmap,#mpl_util.LevelColormap(levels,cmap=),
+			# get rid of first 25% of the colors of that cmap
+			truncated_cmap = mpl_util.truncate_colormap(cmap, 0.25, 1.0)
+			levels=[0,200,400,600,800,1000,1250,1500,1750,2000,2250,2500,3000]
+			x, y = plot(lon,lat)
+
+			# Create the plot
+			topo_plot = plot.contourf(x,y,height,levels,
+					cmap=truncated_cmap,
 					extend='max',
 					alpha=1.0,
 					origin='lower')
 
-			cbar = plt.colorbar(CS1, orientation = "horizontal", fraction=0.046, pad=0.04, aspect=30, shrink=0.67)
-
-			CS1.axis='tight'
+			# add a colorbar
+			cbar = plt.colorbar(topo_plot, orientation = "horizontal", fraction=0.046, pad=0.04, aspect=30, shrink=0.67)
+			topo_plot.axis='tight'
 		
 	
 	def findSubsetIndices(self,min_lat,max_lat,min_lon,max_lon,lats,lons):
@@ -188,6 +189,7 @@ class BackgroundLayer(Layer):
 		res[0]=minI; res[1]=maxI; res[2]=minJ; res[3]=maxJ;
 		return res
 
+
 class SourceLayer(Layer):
 	def __init__(self, region, model, run, valid, hours, day):
 		self.region = region
@@ -198,6 +200,10 @@ class SourceLayer(Layer):
 		self.day    = day
 	
 	def plot(self, plot, fig):
+		"""
+		Plot a little box in the bottom left corner with round box edges.
+		Depending on the plotted area, the position has to be adjusted.
+		"""
 		if self.region == "ger":
 			fig.text(0.348,0.199,'©wetterquelle.de',fontsize=20,
 					ha='center',va='top',color='k',

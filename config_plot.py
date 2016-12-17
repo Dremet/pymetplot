@@ -12,7 +12,7 @@ plt_dir = "plots/"
 fig_size = (14,12)
 
 # saving options matplotlib
-bbox_inches ='tight'
+bbox_inches = 'tight'
 transparent = False
 
 

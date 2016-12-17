@@ -76,8 +76,6 @@ class GFS(Model):
 		# saving datetime object with information on when the model started running
 		run_time = datetime.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours = hours_ago)
 
-		print(datetime.now().replace(minute=0, second=0, microsecond=0))
-
 		return run_time
 
 

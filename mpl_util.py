@@ -1,10 +1,16 @@
 #!/usr/bin/python3
+# -*- coding: utf-8 -*-
 
-### CREDITS: http://www.trondkristiansen.com/?page_id=846 ###
+################################################
+# Github: https://github.com/Dremet/pymetplot  #
+################################################
+
 
 import matplotlib
 from numpy import ma
+import numpy as np
 import pylab as pl
+import matplotlib.colors as colors
 
 
 
@@ -13,6 +19,7 @@ import pylab as pl
 # ------------------
 # Plot land mask
 # ------------------
+### Credits: http://www.trondkristiansen.com/?page_id=846
 
 def landmask(M, color='0.8'):
 
@@ -33,6 +40,7 @@ def landmask(M, color='0.8'):
 # -------------
 # Colormap
 # -------------
+# Credits: http://www.trondkristiansen.com/?page_id=846
 
 # Colormap, smlgn. med Rob Hetland
 
@@ -61,3 +69,15 @@ def LevelColormap(levels, cmap=None):
     # Use 
     return matplotlib.colors.LinearSegmentedColormap(
         '%s_levels' % cmap.name, cdict, 256)
+
+
+# --------------------------------------------
+# Split standard cmap and use a part of it
+# --------------------------------------------
+# Credits: unutbu on stackoverflow http://bit.ly/2gW5zkj
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+  new_cmap = colors.LinearSegmentedColormap.from_list(
+    'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+    cmap(np.linspace(minval, maxval, n)))
+  return new_cmap
