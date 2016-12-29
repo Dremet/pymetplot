@@ -230,7 +230,7 @@ class SourceLayer(Layer):
 
 if __name__ == '__main__':
 	# create directory for current plots
-	sp.call(["mkdir", "-p", pcfg.plt_dir])
+	#sp.call(["mkdir", "-p", pcfg.plt_dir])
 
 	region = "eu"
 

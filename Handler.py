@@ -30,7 +30,9 @@ class Handler():
 
 	def run(self):
 
-		pass
+		for model in self.models:
+			model.getDataFiles()
+			# model.plot()
 
 
 

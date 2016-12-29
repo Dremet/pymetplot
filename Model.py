@@ -6,6 +6,7 @@
 ################################################
 
 import os
+import subprocess as sp
 import numpy.ma as ma
 from datetime import datetime, timedelta
 from time import strftime,sleep
@@ -46,6 +47,14 @@ class Model():
 			else:
 				self.output_timesteps.append(FcstOutputTimestep(self, fcst_hour))
 
+	def getDataFiles(self):
+		"""
+		Downloads (or copies) files.
+		"""
+
+		for output_timestep in self.output_timesteps:
+			output_timestep.getDataFile()
+
 
 # Global Forecast System #
 # https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/global-forcast-system-gfs #
@@ -57,6 +66,7 @@ class GFS(Model):
 	def getLatestInitTime(self):
 		"""
 		Returns datetime object of last model run of which data should already be available or will be available soon (<1hour).
+		
 		"""
 
 		current_hour = int(strftime("%H"))
@@ -78,6 +88,23 @@ class GFS(Model):
 
 		return run_time
 
+	def getFullDownloadLink(self, forecast_hour):
+		"""
+		Provides full download path for given forecast hour.
+
+		"""
+
+		# get init time as string
+		model_init_str = self.init.strftime("%Y%m%d%H")
+
+		# create folder and file name
+		foldername = 'gfs.' + model_init_str
+		filename   = 'gfs.t' + model_init_str[-2:] + 'z.pgrb2.0p25.f' + '{0:0>3}'.format(forecast_hour)
+		
+		# put all parts together in order to create the full download path
+		# if given this is also done for alternative link
+		return (self.source_link + foldername + '/' + filename, self.source_link_alt + foldername + '/' + filename if len(self.source_link_alt) > 0 else "")
+
 
 # ICON (Icosahedral non-hydrostatic) general circulation model #
 # http://www.mpimet.mpg.de/en/science/models/icon/ #
@@ -91,6 +118,12 @@ class ICON(Model):
 		"""
 		pass
 
+	def getDataFiles(self):
+		"""
+
+		"""
+
+		pass
 
 
 # Output Timestep #
@@ -99,8 +132,38 @@ class OutputTimestep():
 		self.forecast_hour = forecast_hour
 		self.model         = model
 
-	def downloadFile(self):
-		pass
+	def getDataFile(self):
+		
+		if self.model.data_source == "link":
+			
+			link, alt_link = self.model.getFullDownloadLink(self.forecast_hour)
+
+			downloaded = 0
+
+			while not downloaded == 1:
+				try:
+					# try primary link
+					sp.check_call(["wget", "-O", link.split("/")[-1] + ".grb", link])
+					
+					downloaded = 1
+					
+				except sp.CalledProcessError:
+					# alternative download source given? let's give it a try
+					if len(alt_link) > 0:
+						try:
+							sp.check_call(["wget", "-O", alt_link.split("/")[-1] + ".grb", alt_link])
+							
+							downloaded = 1
+							
+						except sp.CalledProcessError:
+							# file not available at the servers, so checking again in 15 seconds
+							
+							sleep(15)
+					else:
+						sleep(15)
+								
+		else:
+			raise NotImplementedError("Currently not implemented to get data files from somewhere else than ftp/http.")
 
 
 # Initialization Output Timestep #

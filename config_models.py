@@ -20,9 +20,9 @@ model_classes = {"GFS" : GFS, "ICON" : ICON}
 # init_time       -> "latest" or date in format "YYYYMMDD_HH"
 # fcst_hours      -> iterable with forecast hours
 # data_source     -> "link" or "dir"
-# source_link     -> may be empty of data_source is "dir"
+# source_link     -> may be empty if data_source is "dir"
 # source_link_alt -> alternative source on the internet (may be empty!)
-# source_dir      -> may be empty of data_source is "link"
+# source_dir      -> may be empty if data_source is "link"
 
 props = {
 	"GFS" : 
